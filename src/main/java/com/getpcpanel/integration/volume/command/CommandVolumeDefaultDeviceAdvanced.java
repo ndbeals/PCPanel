@@ -1,5 +1,9 @@
 package com.getpcpanel.integration.volume.command;
 
+import java.util.LinkedHashSet;
+import java.util.Objects;
+import java.util.stream.Stream;
+
 import com.getpcpanel.commands.command.ButtonAction;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.getpcpanel.commands.meta.CommandCategory;
@@ -8,6 +12,7 @@ import com.getpcpanel.commands.meta.CommandMeta;
 import javax.annotation.Nullable;
 
 import com.getpcpanel.util.CdiHelper;
+import com.getpcpanel.integration.volume.platform.AudioDevice;
 import com.getpcpanel.integration.volume.platform.DataFlow;
 import com.getpcpanel.integration.volume.platform.Role;
 import com.getpcpanel.integration.volume.platform.windows.SndCtrlWindows;
@@ -51,10 +56,22 @@ public class CommandVolumeDefaultDeviceAdvanced extends CommandVolume implements
         // roleConsole with it, and leaves roleCommunications — the "Default Communications Device" —
         // to the two communication fields.
         var windowsSndCtrl = windowsSndCtrlOpt.get();
-        windowsSndCtrl.setDefaultDevice(mediaPb, DataFlow.dfRender, Role.roleMultimedia);
-        windowsSndCtrl.setDefaultDevice(mediaRec, DataFlow.dfCapture, Role.roleMultimedia);
-        windowsSndCtrl.setDefaultDevice(communicationPb, DataFlow.dfRender, Role.roleCommunications);
-        windowsSndCtrl.setDefaultDevice(communicationRec, DataFlow.dfCapture, Role.roleCommunications);
+        var switched = Stream.of(
+                windowsSndCtrl.setDefaultDevice(mediaPb, DataFlow.dfRender, Role.roleMultimedia),
+                windowsSndCtrl.setDefaultDevice(mediaRec, DataFlow.dfCapture, Role.roleMultimedia),
+                windowsSndCtrl.setDefaultDevice(communicationPb, DataFlow.dfRender, Role.roleCommunications),
+                windowsSndCtrl.setDefaultDevice(communicationRec, DataFlow.dfCapture, Role.roleCommunications));
+        fireFeedback(switchedToText(switched));
+    }
+
+    /**
+     * The overlay's name for a press: each device switched to, in field order, one per line, a name shown once.
+     * {@code switched} holds null for a field that switched nothing.
+     */
+    static String switchedToText(Stream<? extends AudioDevice> switched) {
+        var names = new LinkedHashSet<String>();
+        switched.filter(Objects::nonNull).map(AudioDevice::name).filter(Objects::nonNull).forEach(names::add);
+        return String.join("\n", names);
     }
 
     @Nullable

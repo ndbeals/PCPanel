@@ -1,6 +1,7 @@
 package com.getpcpanel.integration.volume.platform.windows;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -88,6 +89,17 @@ class SndCtrlWindowsDefaultDeviceTest {
         snd.setDefaultDevice(twinB, DataFlow.dfRender, Role.roleCommunications);
 
         assertEquals(List.of(twinA, twinB), snd.switchedTo);
+    }
+
+    @Test
+    void returnsTheDeviceItSwitchedTo() {
+        var snd = withDevices();
+
+        var switched = snd.setDefaultDevice("Yeti", DataFlow.dfCapture, Role.roleMultimedia);
+
+        assertEquals(YETI_ID, switched.id());
+        assertNull(snd.setDefaultDevice("Nonexistent", DataFlow.dfRender, Role.roleMultimedia));
+        assertNull(snd.setDefaultDevice("", DataFlow.dfRender, Role.roleMultimedia));
     }
 
     @Test

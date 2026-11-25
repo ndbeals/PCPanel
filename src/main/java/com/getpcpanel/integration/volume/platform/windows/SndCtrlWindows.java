@@ -149,24 +149,28 @@ public class SndCtrlWindows implements ISndCtrl {
     /**
      * Switches the {@code flow}/{@code role} default to the device {@code deviceRef} points at. Blank
      * leaves that default alone, so an action can set only the pairs it cares about.
+     *
+     * @return the device switched to, or null when {@code deviceRef} is blank or matches no connected device
      */
-    public void setDefaultDevice(String deviceRef, DataFlow flow, Role role) {
+    @Nullable
+    public AudioDevice setDefaultDevice(String deviceRef, DataFlow flow, Role role) {
         if (StringUtils.isBlank(deviceRef)) {
-            return;
+            return null;
         }
-        String deviceId;
+        AudioDevice device;
         synchronized (devices) {
-            deviceId = resolveDeviceRef(devices.values(), deviceRef, flow);
+            device = resolveDeviceRef(devices.values(), deviceRef, flow);
         }
-        if (deviceId == null) {
+        if (device == null) {
             log.warn("No connected {} device matches '{}', leaving the {} default alone", flow, deviceRef, role);
-            return;
+            return null;
         }
-        applyDefaultDevice(deviceId, flow, role);
+        applyDefaultDevice(device.id(), flow, role);
+        return device;
     }
 
     /**
-     * Resolves a stored device reference to the endpoint id of a connected device on {@code flow}.
+     * Resolves a stored device reference to a connected device on {@code flow}.
      *
      * <p>A reference is either an endpoint id or part of a device's name. Names are matched loosely on
      * purpose: Windows numbers a device by the order it was enumerated ("Speakers (2- USB Audio)"), so
@@ -177,7 +181,7 @@ public class SndCtrlWindows implements ISndCtrl {
      * its own device: "Headset" picks "Headset" rather than "Headset Earphone (3- Wireless)".
      */
     @Nullable
-    static String resolveDeviceRef(Collection<? extends AudioDevice> candidates, String deviceRef, DataFlow flow) {
+    static AudioDevice resolveDeviceRef(Collection<? extends AudioDevice> candidates, String deviceRef, DataFlow flow) {
         var onFlow = StreamEx.of(candidates).filter(d -> d.dataflow() == flow).toList();
         for (var matcher : List.<Predicate<AudioDevice>>of(
                 d -> StringUtils.equals(d.id(), deviceRef),
@@ -185,7 +189,7 @@ public class SndCtrlWindows implements ISndCtrl {
                 d -> StringUtils.containsIgnoreCase(d.name(), deviceRef))) {
             var match = StreamEx.of(onFlow).findFirst(matcher);
             if (match.isPresent()) {
-                return match.get().id();
+                return match.get();
             }
         }
         return null;
