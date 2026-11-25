@@ -1205,6 +1205,10 @@
               </div>
               <div class="pc-card pad stack" [class.disabled-block]="!overlayStylingSupported()">
                 <div class="row">
+                  <div class="row-text"><div class="row-label">Background gradient</div><div class="row-sub">a light gloss over the top of the background</div></div>
+                  <pc-toggle [value]="s.overlayBackgroundGradient" [disabled]="!overlayStylingSupported()" (valueChange)="patch('overlayBackgroundGradient', $event)"></pc-toggle>
+                </div>
+                <div class="row">
                   <div class="row-text"><div class="row-label">Bar follows control light</div><div class="row-sub">use the dial's current light colour as the bar; falls back to the Bar colour above when the light is off or animated</div></div>
                   <pc-toggle [value]="s.overlayBarFollowsLight" [disabled]="!overlayStylingSupported()" (valueChange)="patch('overlayBarFollowsLight', $event)"></pc-toggle>
                 </div>

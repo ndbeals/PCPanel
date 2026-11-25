@@ -134,6 +134,8 @@ public class Save {
     /** Show the controlled-target's icon on the overlay (the bar is always shown). */
     private boolean overlayShowIcon = true;
     private String overlayBackgroundColor = DEFAULT_OVERLAY_BG_COLOR;
+    /** A light gloss fading down over the top half of the overlay's background. */
+    private boolean overlayBackgroundGradient = true;
     private String overlayTextColor = DEFAULT_OVERLAY_TEXT_COLOR;
     private String overlayBarColor = DEFAULT_OVERLAY_BAR_COLOR;
     private String overlayBarBackgroundColor = DEFAULT_OVERLAY_BAR_BACKGROUND_COLOR;

@@ -962,6 +962,7 @@ export interface SettingsDto {
     oscEnabled: boolean;
     oscListenPort: number;
     overlayBackgroundColor: string;
+    overlayBackgroundGradient: boolean;
     overlayBarBackgroundColor: string;
     overlayBarColor: string;
     overlayBarCornerRounding?: number;

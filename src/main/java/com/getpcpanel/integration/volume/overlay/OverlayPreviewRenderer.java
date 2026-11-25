@@ -23,6 +23,9 @@ import lombok.extern.log4j.Log4j2;
  */
 @Log4j2
 public final class OverlayPreviewRenderer {
+    /** The preview is drawn at twice the overlay's size and shown at its size, so it stays sharp on a high-DPI screen. */
+    public static final int PREVIEW_SCALE = 2;
+
     private OverlayPreviewRenderer() {
     }
 
@@ -33,19 +36,21 @@ public final class OverlayPreviewRenderer {
         }
         try {
             var renderer = new OverlayRenderer();
-            var h = renderer.setStyles(save);
+            renderer.setStyles(save);
             var w = renderer.width();
             renderer.setValue(valuePercent);
             renderer.setName(name);
+            var h = renderer.computeHeight();
             // With soft takeover on, show its marker line too, a little past the level, so its look can be set here.
             if (save.isSoftTakeoverKnobs() || save.isSoftTakeoverSliders()) {
                 renderer.setMarker(Math.min(100, valuePercent + 20));
             }
             renderer.setIcon(sampleIcon(save.getOverlayIconSize()));
 
-            var img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB_PRE);
+            var img = new BufferedImage(w * PREVIEW_SCALE, h * PREVIEW_SCALE, BufferedImage.TYPE_INT_ARGB_PRE);
             var g = img.createGraphics();
             try {
+                g.scale(PREVIEW_SCALE, PREVIEW_SCALE);
                 renderer.render(g, w, h);
             } finally {
                 g.dispose();

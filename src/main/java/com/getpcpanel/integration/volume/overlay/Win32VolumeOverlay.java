@@ -49,6 +49,12 @@ import lombok.extern.log4j.Log4j2;
  * dedicated thread owns the window, pumps its message queue with {@code PeekMessage} (dispatched to
  * the native procedure), and performs all show/hide/update work directly as JNA <em>downcalls</em>.
  * The thread parks while the overlay is hidden and is unparked by {@link #show} / the dismiss timer.
+ *
+ * <p>Sizes and positions are in overlay units: pixels at 96 DPI, which is all the process sees, as it is not DPI
+ * aware. The window's thread is made per-monitor DPI aware ({@link Win32Dpi}), so the overlay is drawn at the
+ * primary monitor's real pixel density instead of being stretched by Windows; {@link #getScreenSize} answers in
+ * overlay units at that same scale. A name of several lines makes the window taller than the height it is positioned
+ * by, and it grows away from the screen edge it is anchored to.
  */
 @Log4j2
 class Win32VolumeOverlay implements OverlayWindow {
@@ -73,7 +79,12 @@ class Win32VolumeOverlay implements OverlayWindow {
     });
 
     private int width = OverlayRenderer.WIDTH;
+    /** The height for a one-line name, which {@link Overlay} positions the window by. */
     private int height = OverlayRenderer.DEFAULT_HEIGHT;
+    /** The height for the name being shown. */
+    private int contentHeight = OverlayRenderer.DEFAULT_HEIGHT;
+    /** How much of the extra height of a taller window goes above its position: 0 when anchored at the top, 1 at the bottom. */
+    private float growUp;
     private int x;
     private int y = 48;
 
@@ -82,6 +93,7 @@ class Win32VolumeOverlay implements OverlayWindow {
     private volatile boolean pendingShow;
     private volatile boolean pendingHide;
     private boolean visible;            // only touched on the loop thread
+    private boolean dpiAware;           // only touched on the loop thread
     private ScheduledFuture<?> dismissFuture;
 
     @Override
@@ -92,6 +104,7 @@ class Win32VolumeOverlay implements OverlayWindow {
             renderer.setName(content.name());
             renderer.setBarColorOverride(content.barColorCss());
             renderer.setMarker(content.marker() < 0 ? -1 : Math.round(content.marker() * 100f));
+            contentHeight = renderer.computeHeight();
         }
         pendingHide = false;
         pendingShow = true;
@@ -104,7 +117,13 @@ class Win32VolumeOverlay implements OverlayWindow {
     public void setStyles(Save save) {
         synchronized (lock) {
             height = renderer.setStyles(save);
+            contentHeight = renderer.computeHeight();
             width = renderer.width();
+            growUp = switch (save.getOverlayPosition()) {
+                case topLeft, topMiddle, topRight -> 0f;
+                case middleLeft, middleMiddle, middleRight -> 0.5f;
+                case bottomLeft, bottomMiddle, bottomRight -> 1f;
+            };
         }
     }
 
@@ -132,8 +151,12 @@ class Win32VolumeOverlay implements OverlayWindow {
 
     @Override
     public ScreenSize getScreenSize() {
-        var user32 = User32.INSTANCE;
-        return new ScreenSize(user32.GetSystemMetrics(WinUser.SM_CXSCREEN), user32.GetSystemMetrics(WinUser.SM_CYSCREEN));
+        return Win32Dpi.whileAware(() -> {
+            var user32 = User32.INSTANCE;
+            var scale = Win32Dpi.primaryScale();
+            return new ScreenSize((int) Math.round(user32.GetSystemMetrics(WinUser.SM_CXSCREEN) / scale),
+                    (int) Math.round(user32.GetSystemMetrics(WinUser.SM_CYSCREEN) / scale));
+        });
     }
 
     private void ensureStarted() {
@@ -178,6 +201,7 @@ class Win32VolumeOverlay implements OverlayWindow {
             initialHeight = height;
         }
 
+        dpiAware = Win32Dpi.makeThreadAware();
         var exStyle = WinUser.WS_EX_LAYERED | WinUser.WS_EX_TRANSPARENT | User32.WS_EX_TOPMOST
                 | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE;
         var hWnd = user32.CreateWindowEx(exStyle, WINDOW_CLASS, "PCPanel Volume Overlay",
@@ -216,15 +240,20 @@ class Win32VolumeOverlay implements OverlayWindow {
 
     /** Renders the current state into a layered-window bitmap. Runs on the loop thread. */
     private void doShow(HWND hWnd) {
+        int logicalW;
+        int logicalH;
         int w;
         int ht;
         int posX;
         int posY;
+        var scale = dpiAware ? Win32Dpi.primaryScale() : 1;
         synchronized (lock) {
-            w = width;
-            ht = height;
-            posX = x;
-            posY = y;
+            logicalW = width;
+            logicalH = contentHeight;
+            w = (int) Math.ceil(width * scale);
+            ht = (int) Math.ceil(contentHeight * scale);
+            posX = (int) Math.round(x * scale);
+            posY = (int) Math.round((y - (contentHeight - height) * growUp) * scale);
         }
 
         try {
@@ -235,7 +264,8 @@ class Win32VolumeOverlay implements OverlayWindow {
             var image = new BufferedImage(w, ht, BufferedImage.TYPE_INT_ARGB_PRE);
             var g2 = image.createGraphics();
             try {
-                renderer.render(g2, w, ht);
+                g2.scale(scale, scale);
+                renderer.render(g2, logicalW, logicalH);
             } finally {
                 g2.dispose();
             }

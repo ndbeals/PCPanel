@@ -42,7 +42,7 @@ export class OverlayPreviewRenderer {
   }
 }
 
-/** Position a preview image inside its mock desktop per overlayPosition + (scaled) edge padding. */
+/** Position a preview image inside its mock desktop per overlayPosition + (scaled) edge padding, at the overlay's width. */
 export function overlayPreviewStyle(s: SettingsDto | null | undefined): Record<string, string> {
   const pos = s?.overlayPosition ?? 'bottomRight';
   const pad = Math.max(6, Math.min(36, Math.round((s?.overlayPadding ?? 16) * 0.6))) + 'px';
@@ -55,5 +55,7 @@ export function overlayPreviewStyle(s: SettingsDto | null | undefined): Record<s
   else if (pos.endsWith('Right')) st['right'] = pad;
   else { st['left'] = '50%'; tf.push('translateX(-50%)'); }
   if (tf.length) st['transform'] = tf.join(' ');
+  // The PNG is rendered at twice the overlay's size (OverlayPreviewRenderer.PREVIEW_SCALE): show it at the overlay's own.
+  st['width'] = Math.max(120, Math.min(800, s?.overlayWidth ?? 340)) + 'px';
   return st;
 }

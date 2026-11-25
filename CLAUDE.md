@@ -586,7 +586,8 @@ Wave Link RPC client), `osc/`, `mqtt/` (Eclipse Paho mqttv5), `homeassistant/`, 
 feature families `volume/`, `keyboard/`, `program/`, `analogbands/`, `display/`, `profile/`, `dialvalue/` (the *Set dial
 value* button action), and `device/` (the brightness command only). Each owns its `command/` + `CommandModule` and (where applicable) its REST,
 SPI impls, and service. The on-screen volume overlay lives in `integration/volume/overlay/`: a Win32 JNA
-layered window on Windows (`Win32VolumeOverlay`) and a
+layered window on Windows (`Win32VolumeOverlay`; the process is not DPI aware, so its thread opts into per-monitor
+awareness through `Win32Dpi` and draws at the primary monitor's scale, in overlay units of 96-DPI pixels) and a
 desktop-drawn OSD over D-Bus on Linux/Wayland (`LinuxOverlay`, AWT-free) — KDE Plasma's native volume
 OSD (`org.kde.osdService.volumeChanged`, the same real-time bar as Plasma's own volume keys) when
 plasmashell is on the bus, **else no overlay** (clean no-op). A notification fallback was deliberately

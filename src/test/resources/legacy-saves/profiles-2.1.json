@@ -2432,6 +2432,7 @@
   "overlayShowNumber" : true,
   "overlayShowIcon" : true,
   "overlayBackgroundColor" : "overlayBackgroundColor-16",
+  "overlayBackgroundGradient" : true,
   "overlayTextColor" : "overlayTextColor-23",
   "overlayBarColor" : "overlayBarColor-18",
   "overlayBarBackgroundColor" : "overlayBarBackgroundColor-17",

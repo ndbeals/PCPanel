@@ -10,6 +10,7 @@ import java.awt.geom.Area;
 import java.awt.geom.Ellipse2D;
 import java.awt.geom.Rectangle2D;
 import java.awt.geom.RoundRectangle2D;
+import java.util.List;
 import java.util.regex.Pattern;
 
 import com.getpcpanel.profile.Save;
@@ -51,6 +52,7 @@ class OverlayRenderer {
     // Showing the app name drives the whole layout: on → two rows (name + bar), off → a compact single row.
     private boolean showAppName = true;
     private boolean fontBold = true;
+    private boolean gradient = true;
     private String fontFamily = "Segoe UI";
     private int textSize = Save.DEFAULT_OVERLAY_TEXT_SIZE;
     private int iconSize = ICON_SIZE;
@@ -91,6 +93,12 @@ class OverlayRenderer {
         this.name = name == null ? "" : name;
     }
 
+    /** The name's lines, blank ones left out; one empty line for no name, so the layout keeps its row. */
+    private List<String> nameLines() {
+        var lines = name.lines().map(String::strip).filter(l -> !l.isEmpty()).toList();
+        return lines.isEmpty() ? List.of("") : lines;
+    }
+
     /**
      * Overrides the bar colour with the control's current light colour (a CSS/hex string), or clears the
      * override when {@code null}/blank so the configured bar colour is used.
@@ -100,9 +108,11 @@ class OverlayRenderer {
     }
 
     /**
-     * Applies the persisted overlay styling and returns the resulting window height.
+     * Applies the persisted overlay styling and returns the resulting window height for a one-line name
+     * ({@link #baseHeight}).
      */
     int setStyles(Save save) {
+        gradient = save.isOverlayBackgroundGradient();
         showNumber = save.isOverlayShowNumber();
         showIcon = save.isOverlayShowIcon();
         showAppName = save.isOverlayShowAppName();
@@ -127,26 +137,40 @@ class OverlayRenderer {
         markerRounding = Math.max(0, save.getOverlayTakeoverMarkerRounding());
         markerShown = markerWidth > 0 && (save.isSoftTakeoverKnobs() || save.isSoftTakeoverSliders());
         markerColor = parseColor(save.getOverlayTakeoverMarkerColor(), DEFAULT_MARKER_COLOR);
-        return computeHeight();
+        return baseHeight();
     }
 
     int width() {
         return width;
     }
 
+    /** The height for the current name: each of its lines past the first adds a row in the two-row layout. */
     int computeHeight() {
+        return computeHeight(nameLines().size());
+    }
+
+    /** The height for a one-line name, which the overlay is positioned by. */
+    int baseHeight() {
+        return computeHeight(1);
+    }
+
+    private int computeHeight(int lines) {
         var pad = contentPadding;
         var effIcon = showIcon ? iconSize : 0;
         if (showAppName) {
             // The thumb stands out below the bar; the padding comes below it.
-            return pad + topRow() + elementGap + barHeight + thumbOverhang() + pad;
+            return pad + topRow(lines) + elementGap + barHeight + thumbOverhang() + pad;
         }
-        return Math.max(DEFAULT_HEIGHT, pad * 2 + Math.max(Math.max(effIcon, textSize + 4), barHeight + 2 * thumbOverhang()));
+        return Math.max(DEFAULT_HEIGHT, pad * 2 + Math.max(Math.max(effIcon, lineHeight()), barHeight + 2 * thumbOverhang()));
     }
 
-    /** The two-line layout's top row: the icon (when shown) or the text, whichever is taller. */
-    private int topRow() {
-        return Math.max(showIcon ? iconSize : 0, textSize + 4);
+    private int lineHeight() {
+        return textSize + 4;
+    }
+
+    /** The two-row layout's top row: the icon (when shown) or the name's lines, whichever is taller. */
+    private int topRow(int lines) {
+        return Math.max(showIcon ? iconSize : 0, lines * lineHeight());
     }
 
     /** How far the knob, or the takeover marker, reaches past the bar's ends at 0% and 100%: half its width. */
@@ -173,20 +197,31 @@ class OverlayRenderer {
         g2.setFont(new Font(fontFamily, fontBold ? Font.BOLD : Font.PLAIN, size));
     }
 
+    /**
+     * Paints the overlay {@code w} by {@code h} in overlay units; scale {@code g2} first to paint it at a display's
+     * pixel density. Text is antialiased in grey, not sub-pixel: the overlay is translucent, and sub-pixel text is
+     * only right on an opaque background.
+     */
     void render(Graphics2D g2, int w, int h) {
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_LCD_HRGB);
+        g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+        g2.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, RenderingHints.VALUE_FRACTIONALMETRICS_ON);
+        g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+        g2.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
+        g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
 
         var windowArc = Math.min(windowCornerRadius, Math.min(w, h));
 
-        // ── Background pill + glass shimmer ──────────────────────────
+        // ── Background pill, with its glass shimmer when the gradient is on ──
         g2.setColor(backgroundColor);
         g2.fill(new RoundRectangle2D.Float(0, 0, w, h, windowArc, windowArc));
-        var gloss = new GradientPaint(
-                0, 0, withAlpha(Color.WHITE, Math.clamp(backgroundColor.getAlpha() / 4, 18, 60)),
-                0, h / 2f, withAlpha(Color.WHITE, 0));
-        g2.setPaint(gloss);
-        g2.fill(new RoundRectangle2D.Float(0, 0, w, h / 2f, windowArc, windowArc));
+        if (gradient) {
+            var gloss = new GradientPaint(
+                    0, 0, withAlpha(Color.WHITE, Math.clamp(backgroundColor.getAlpha() / 4, 18, 60)),
+                    0, h / 2f, withAlpha(Color.WHITE, 0));
+            g2.setPaint(gloss);
+            g2.fill(new RoundRectangle2D.Float(0, 0, w, h / 2f, windowArc, windowArc));
+        }
 
         if (showAppName) {
             renderTwoLine(g2, w, h);
@@ -195,10 +230,14 @@ class OverlayRenderer {
         }
     }
 
-    /** [icon] [name] [percent] on the top row, full-width bar beneath. Matches the settings preview. */
+    /**
+     * [icon] [name] [percent] on the top row, full-width bar beneath. Matches the settings preview. A name of several
+     * lines stacks them in the top row, centred on it like the icon and the percentage.
+     */
     private void renderTwoLine(Graphics2D g2, int w, int h) {
         var pad = contentPadding;
-        var topRow = topRow();
+        var lines = nameLines();
+        var topRow = topRow(lines.size());
         var rowTop = pad;
 
         var x = pad;
@@ -222,13 +261,16 @@ class OverlayRenderer {
             g2.drawString(label, valueLeft, textBaseline);
         }
 
-        // App name fills the space between the icon and the value, ellipsised if needed.
-        if (!name.isBlank()) {
-            var nameRight = (showNumber ? valueLeft - elementGap : valueRight);
-            var avail = nameRight - x;
-            if (avail > 4) {
-                g2.setColor(textColor);
-                g2.drawString(ellipsize(fm, name, avail), x, textBaseline);
+        // App name fills the space between the icon and the value, each line ellipsised if needed.
+        var nameRight = (showNumber ? valueLeft - elementGap : valueRight);
+        var avail = nameRight - x;
+        if (avail > 4) {
+            g2.setColor(textColor);
+            var firstBaseline = textBaseline - (lines.size() - 1) * lineHeight() / 2;
+            for (var i = 0; i < lines.size(); i++) {
+                if (!lines.get(i).isEmpty()) {
+                    g2.drawString(ellipsize(fm, lines.get(i), avail), x, firstBaseline + i * lineHeight());
+                }
             }
         }
 

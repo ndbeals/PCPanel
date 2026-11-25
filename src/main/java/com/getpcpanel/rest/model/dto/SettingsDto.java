@@ -70,6 +70,7 @@ public class SettingsDto {
     private boolean overlayUseLog;
     private boolean overlayShowNumber;
     private String overlayBackgroundColor;
+    private boolean overlayBackgroundGradient;
     private String overlayTextColor;
     private String overlayBarColor;
     private String overlayBarBackgroundColor;
@@ -142,6 +143,7 @@ public class SettingsDto {
         dto.overlayUseLog = save.isOverlayUseLog();
         dto.overlayShowNumber = save.isOverlayShowNumber();
         dto.overlayBackgroundColor = save.getOverlayBackgroundColor();
+        dto.overlayBackgroundGradient = save.isOverlayBackgroundGradient();
         dto.overlayTextColor = save.getOverlayTextColor();
         dto.overlayBarColor = save.getOverlayBarColor();
         dto.overlayBarBackgroundColor = save.getOverlayBarBackgroundColor();
@@ -213,6 +215,7 @@ public class SettingsDto {
         save.setOverlayUseLog(overlayUseLog);
         save.setOverlayShowNumber(overlayShowNumber);
         save.setOverlayBackgroundColor(overlayBackgroundColor);
+        save.setOverlayBackgroundGradient(overlayBackgroundGradient);
         save.setOverlayTextColor(overlayTextColor);
         save.setOverlayBarColor(overlayBarColor);
         save.setOverlayBarBackgroundColor(overlayBarBackgroundColor);
